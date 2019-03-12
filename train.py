@@ -19,7 +19,7 @@ import sys
 
 
 class Graph:
-    def __init__(self, num=1, mode="train"):
+    def __init__(self, num=1, mode="train", L=None, mels=None, mags=None):
         '''
         Args:
           num: Either 1 or 2. 1 for Text2Mel 2 for SSRN.
@@ -37,7 +37,10 @@ class Graph:
         ## mels: Reduced melspectrogram. (B, T/r, n_mels) float32
         ## mags: Magnitude. (B, T, n_fft//2+1) float32
         if mode=="train":
-            self.L, self.mels, self.mags, self.fnames, self.num_batch = get_batch()
+            if L != None and mels != None and mags != None:
+                self.L, self.mels, self.mags = L, mels, mags
+            else:
+                self.L, self.mels, self.mags, self.fnames, self.num_batch = get_batch()
             self.prev_max_attentions = tf.ones(shape=(hp.B,), dtype=tf.int32)
             self.gts = tf.convert_to_tensor(guided_attention())
         else:  # Synthesize

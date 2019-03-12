@@ -35,7 +35,7 @@ class Hyperparams:
     data = "/data/private/voice/LJSpeech-1.0"
     # data = "/data/private/voice/kate"
     test_data = 'harvard_sentences.txt'
-    vocab = "PE abcdefghijklmnopqrstuvwxyz'.?" # P: Padding, E: EOS.
+    vocab = "PE abcdefghijklmnopqrstuvwxyz'.,?" # P: Padding, E: EOS.
     max_N = 180 # Maximum number of characters.
     max_T = 210 # Maximum number of mel frames.
 
@@ -45,3 +45,7 @@ class Hyperparams:
     sampledir = 'samples'
     B = 32 # batch size
     num_iterations = 2000000
+
+    # TPU data
+    tpu_data_path = "gs://stellarworks-speech/data/LJSpeech-1.1/tf_records/data"
+    tpu_tmp_path = "/home/abhishek/tmp/tpu_tmp"
