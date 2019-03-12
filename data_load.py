@@ -30,6 +30,9 @@ def text_normalize(text):
     text = re.sub("[ ]+", " ", text)
     return text
 
+def get_cleaned_char_ids(text, char2idx):
+    return [char2idx[char.lower()] for char in text if char.lower() in char2idx]
+
 def load_data(mode="train"):
     '''Loads data
       Args:

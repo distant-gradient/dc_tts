@@ -48,4 +48,3 @@ class Hyperparams:
 
     # TPU data
     tpu_data_path = "gs://stellarworks-speech/data/LJSpeech-1.1/tf_records/data"
-    tpu_tmp_path = "/home/abhishek/tmp/tpu_tmp"

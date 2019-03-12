@@ -107,6 +107,22 @@ def model_fn_builder(task_num, init_checkpoint, learning_rate,
 	  raise Exception("Unsupported mode on tpu_train: %s" % mode)
 	return output_spec
 
+
+def input_fn_builder(input_path, num_epochs=500):
+    def input_fn(params):
+        batch_size = params["batch_size"]
+        files = tf.data.Dataset.list_files(input_path)
+        dataset = tf.data.TFRecordDataset(files, num_parallel_reads=32)
+        dataset = dataset.shuffle(1000)
+        dataset = dataset.repeat(num_epochs)
+        dataset = dataset.map(parser_fn, num_parallel_calls=64)
+        dataset = dataset.batch(batch_size)
+        dataset = dataset.prefetch(2)
+        return dataset
+    return input_fn
+
+
+
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
     tf.gfile.MakeDirs(FLAGS.output_dir)
