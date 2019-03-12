@@ -31,7 +31,9 @@ def text_normalize(text):
     return text
 
 def get_cleaned_char_ids(text, char2idx):
-    return [char2idx[char.lower()] for char in text if char.lower() in char2idx]
+    out = [char2idx[char.lower()] for char in text if char.lower() in char2idx]
+    out.append(char2idx["E"])
+    return out
 
 def load_data(mode="train"):
     '''Loads data
