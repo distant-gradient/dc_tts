@@ -19,7 +19,7 @@ import sys
 
 
 class Graph:
-    def __init__(self, num=1, mode="train", L=None, mels=None, mags=None):
+    def __init__(self, num=1, mode="train", L=None, mels=None, mags=None, use_tpu=False):
         '''
         Args:
           num: Either 1 or 2. 1 for Text2Mel 2 for SSRN.
@@ -123,6 +123,9 @@ class Graph:
             # Training Scheme
             self.lr = learning_rate_decay(hp.lr, self.global_step)
             self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
+            if use_tpu:
+                self.optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
+
             tf.summary.scalar("lr", self.lr)
 
             ## gradient clipping

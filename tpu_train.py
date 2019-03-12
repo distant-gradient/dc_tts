@@ -13,6 +13,12 @@ flags.DEFINE_string(
         "output_dir", None,
         "The output directory where the model checkpoints will be written.")
 
+flags.DEFINE_integer(
+        "train_batch_size", 32, "Size of training batch")
+
+flags.DEFINE_integer(
+        "eval_batch_size", 32, "Size of eval batch")
+
 flags.DEFINE_string(
         "tpu_name", None,
         "The Cloud TPU to use for training. This should be either the name "
@@ -39,7 +45,7 @@ flags.DEFINE_integer(
 
 
 def model_fn_builder(task_num, init_checkpoint, learning_rate,
-                     num_train_steps, num_warmup_steps, use_tpu):
+                     num_warmup_steps, use_tpu):
     def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
         """
     	The `model_fn` for TPUEstimator.
@@ -53,21 +59,10 @@ def model_fn_builder(task_num, init_checkpoint, learning_rate,
         for name in sorted(features.keys()):
           tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
       
-        #TODO(anon): figure out a way to pass/consume input here!
-	# input_ids = features["input_ids"]
-        # input_mask = features["input_mask"]
-        # segment_ids = features["segment_ids"]
-        # label_ids = features["label_ids"]
-        # is_real_example = None
-        # if "is_real_example" in features:
-        #   is_real_example = tf.cast(features["is_real_example"], dtype=tf.float32)
-        # else:
-        #   is_real_example = tf.ones(tf.shape(label_ids), dtype=tf.float32)
-      
+        sents, mels, mags = features["sent"], features["mels"], features["mags"] 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
      
-        graph = train.Graph(task_num)
-        total_loss = graph.loss
+        graph = train.Graph(task_num, L=sent, mels=mels, mags=mags, use_tpu=use_tpu)
         
         tvars = tf.trainable_variables()
         initialized_variable_names = {}
@@ -92,21 +87,30 @@ def model_fn_builder(task_num, init_checkpoint, learning_rate,
             init_string = ", *INIT_FROM_CKPT*"
           tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
                           init_string)
-    	output_spec = None
-    	if mode == tf.estimator.ModeKeys.TRAIN:
 
-    	  train_op = optimization.create_optimizer(
-    	      total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-
-    	  output_spec = tf.contrib.tpu.TPUEstimatorSpec(
-    	      mode=mode,
-    	      loss=total_loss,
-    	      train_op=train_op,
-    	      scaffold_fn=scaffold_fn)
-	else:
-	  raise Exception("Unsupported mode on tpu_train: %s" % mode)
+        output_spec = tf.contrib.tpu.TPUEstimatorSpec(
+    	    mode=mode,
+    	    loss=graph.loss,
+    	    train_op=graph.train_op,
+    	    scaffold_fn=scaffold_fn)
 	return output_spec
 
+
+def parse_fn(example_proto):
+    spec = {"sent": tf.VarLenFeature(tf.int64),
+            "mels": tf.VarLenFeature(tf.float32), 
+            "mels_shape": tf.FixedLenFeature([2], tf.int64), 
+            "mags": tf.VarLenFeature(tf.float32),
+            "mags_shape": tf.FixedLenFeature([2], tf.int64) 
+           }
+    features = tf.parse_single_example(example_proto, features=spec)
+    mels = features["mels"]
+    mels = tf.sparse_to_dense(mels.indices, mels.dense_shape, mels.values, default_value=0.0)
+    features["mels"] = tf.reshape(mels, [-1, hp.n_mels])
+    mags = features["mags"]
+    mags = tf.sparse_to_dense(mags.indices, mags.dense_shape, mags.values, default_value=0.0)
+    features["mags"] = tf.reshape(mags, [-1, hp.n_fft//2+1])
+    return features
 
 def input_fn_builder(input_path, num_epochs=500):
     def input_fn(params):
@@ -115,13 +119,11 @@ def input_fn_builder(input_path, num_epochs=500):
         dataset = tf.data.TFRecordDataset(files, num_parallel_reads=32)
         dataset = dataset.shuffle(1000)
         dataset = dataset.repeat(num_epochs)
-        dataset = dataset.map(parser_fn, num_parallel_calls=64)
+        dataset = dataset.map(parse_fn, num_parallel_calls=64)
         dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(2)
         return dataset
     return input_fn
-
-
 
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
@@ -150,11 +152,9 @@ def main(_):
   	    task_num=task_num,
   	    init_checkpoint=FLAGS.init_checkpoint,
   	    learning_rate=FLAGS.learning_rate,
-  	    num_train_steps=num_train_steps,
-  	    num_warmup_steps=num_warmup_steps,
+  	    num_warmup_steps=3,
   	    use_tpu=FLAGS.use_tpu)
 
-    #TODO(anon): code up the estimator and input_fn
     estimator = tf.contrib.tpu.TPUEstimator(
         use_tpu=FLAGS.use_tpu,
         model_fn=model_fn,
@@ -162,20 +162,9 @@ def main(_):
         train_batch_size=FLAGS.train_batch_size,
         eval_batch_size=FLAGS.eval_batch_size)
 
-    # if FLAGS.do_train:
-    #   train_features = convert_examples_to_features(
-    #       train_examples, label_list, FLAGS.max_seq_length, tokenizer)
-    #   tf.logging.info("***** Running training *****")
-    #   tf.logging.info("  Num examples = %d", len(train_examples))
-    #   tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
-    #   tf.logging.info("  Num steps = %d", num_train_steps)
-    #   train_input_fn = input_fn_builder(
-    #       features=train_features,
-    #       seq_length=FLAGS.max_seq_length,
-    #       is_training=True,
-    #       drop_remainder=True)
-    #   estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
-
+    train_input_fn = input_fn_builder(
+        input_path=FLAGS.input_path)
+    estimator.train(input_fn=train_input_fn, max_steps=100000)
 
 if __name__ == "__main__":
     flags.mark_flag_as_required("task_num")

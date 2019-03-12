@@ -8,21 +8,6 @@ import tensorflow as tf
 from tensor2tensor.data_generators import generator_utils  # TODO(anon): Remove this dependency
 
 
-def parse(example_proto):
-    spec = {"sent": tf.VarLenFeature(tf.int64),
-            "mels": tf.VarLenFeature(tf.float32), 
-            "mels_shape": tf.FixedLenFeature([2], tf.int64), 
-            "mags": tf.VarLenFeature(tf.float32),
-            "mags_shape": tf.FixedLenFeature([2], tf.int64) 
-           }
-    features = tf.parse_single_example(example_proto, features=spec)
-    mels = features["mels"]
-    mels = tf.sparse_to_dense(mels.indices, mels.dense_shape, mels.values, default_value=0.0)
-    features["mels"] = tf.reshape(mels, [-1, hp.n_mels])
-    mags = features["mags"]
-    mags = tf.sparse_to_dense(mags.indices, mags.dense_shape, mags.values, default_value=0.0)
-    features["mags"] = tf.reshape(mags, [-1, hp.n_fft//2+1])
-    return features
 
 def _generator(input_path, char2idx):
     with open(os.path.join(input_path, "metadata.csv"), "r") as fp:
