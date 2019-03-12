@@ -32,10 +32,10 @@ def _generator(input_path, char2idx):
         mels = np.load(os.path.join(input_path, "mels", "%s.npy" % uid))
         mags = np.load(os.path.join(input_path, "mags", "%s.npy" % uid))
         yield {"uid": uid,
-               "sent": data_load.get_cleaned_char_id(sent, char2idx),
+               "sent": bytes(data_load.get_cleaned_char_id(sent, char2idx)),
                "mels": mels.tobytes(),
-               "mels_shape": mels.shape,  # TODO(anon): is this necessary?
-               "mags_shape": mags.shape,  # TODO(anon): is this necessary?
+               "mels_shape": mels.shape,
+               "mags_shape": mags.shape,
                "mags": mags.tobytes()}
 
 def generate_tf_records(out_path="/home/abhishek/tmp/tf-records",input_path="/home/abhishek/tmp/LJSpeech-1.1", num_shards=100):

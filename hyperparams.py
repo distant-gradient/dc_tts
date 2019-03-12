@@ -35,7 +35,7 @@ class Hyperparams:
     data = "/home/abhishek/tmp/LJSpeech-1.1"
     # data = "/data/private/voice/kate"
     test_data = 'harvard_sentences.txt'
-    vocab = "PE abcdefghijklmnopqrstuvwxyz'.,?" # P: Padding, E: EOS.
+    vocab = "PE abcdefghijklmnopqrstuvwxyz'.,?" # P: Padding, E: EOS. cannot exceed 256 chars due to TFRecords
     max_N = 180 # Maximum number of characters.
     max_T = 210 # Maximum number of mel frames.
 
