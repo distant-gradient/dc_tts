@@ -12,14 +12,14 @@ from tensor2tensor.data_generators import generator_utils  # TODO(anon): Remove 
 def _generator(input_path, char2idx):
     with open(os.path.join(input_path, "metadata.csv"), "r") as fp:
         lines = fp.readlines()
-    # lines = lines[:200] # debug cap
+    lines = lines[:5000] # debug cap
 
     for line in tqdm.tqdm(lines): 
         uid, _, sent = line.split("|")
         mels = np.load(os.path.join(input_path, "mels", "%s.npy" % uid))
         mags = np.load(os.path.join(input_path, "mags", "%s.npy" % uid))
         yield {"uid": uid,
-               "sent": bytes(data_load.get_cleaned_char_ids(sent, char2idx)),
+               "sent": data_load.get_cleaned_char_ids(sent, char2idx),
                "mels": mels.flatten().tolist(),
                "mels_shape": mels.shape,
                "mags_shape": mags.shape,

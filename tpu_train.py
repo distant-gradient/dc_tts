@@ -19,7 +19,7 @@ flags.DEFINE_string(
         "The input dir with TFRecords.")
 
 flags.DEFINE_integer(
-        "train_batch_size", 32, "Size of training batch")
+        "train_batch_size", 4, "Size of training batch")
 
 flags.DEFINE_integer(
         "iterations_per_loop", 10, "This is the number of train steps running in TPU system before returning to CPU host for each Session.run")
@@ -29,7 +29,7 @@ flags.DEFINE_integer(
 
 
 flags.DEFINE_integer(
-        "eval_batch_size", 32, "Size of eval batch")
+        "eval_batch_size", 2, "Size of eval batch")
 
 flags.DEFINE_string(
         "tpu_name", None,
@@ -73,6 +73,7 @@ def model_fn_builder(task_num, init_checkpoint, use_tpu):
         tf.logging.info("*** Features ***")
         for name in sorted(features.keys()):
           tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
+        tf.logging.info("task_num=%d" % task_num)
       
         sents, mels, mags = features["sent"], features["mels"], features["mags"] 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
@@ -127,18 +128,20 @@ def parse_fn(example_proto):
     mags = tf.sparse_to_dense(mags.indices, mags.dense_shape, mags.values, default_value=0.0)
     features["mags"] = tf.reshape(mags, [-1, hp.n_fft//2+1])
     sent = features["sent"]
-    features["sent"] = tf.sparse_to_dense(sent.indices, sent.dense_shape, sent.values, default_value=0)
+    sent = tf.sparse_to_dense(sent.indices, sent.dense_shape, sent.values, default_value=0)
+    features["sent"] = tf.reshape(sent, [-1])
     return features
 
 def input_fn_builder(input_path, num_epochs=500):
     def input_fn(params):
         batch_size = params["batch_size"]
         files = tf.data.Dataset.list_files(input_path)
+        tf.logging.info("Reading batch size: %d from %s" % (batch_size,  input_path))
         dataset = tf.data.TFRecordDataset(files, num_parallel_reads=32)
         dataset = dataset.shuffle(1000)
         dataset = dataset.repeat(num_epochs)
         dataset = dataset.map(parse_fn, num_parallel_calls=64)
-        dataset = dataset.padded_batch(batch_size, [-1, -1])
+        dataset = dataset.padded_batch(batch_size, padded_shapes={"mels": [-1, hp.n_mels], "mags": [-1, hp.n_fft//2+1], "sent": [-1], "mags_shape": [2], "mels_shape": [2]})
         dataset = dataset.prefetch(2)
         return dataset
     return input_fn
@@ -181,7 +184,7 @@ def main(_):
 
     train_input_fn = input_fn_builder(
         input_path=FLAGS.input_file_pattern)
-    estimator.train(input_fn=train_input_fn, max_steps=100000)
+    estimator.train(input_fn=train_input_fn, max_steps=100)
 
 if __name__ == "__main__":
     flags.mark_flag_as_required("task_num")

@@ -124,7 +124,7 @@ class Graph:
             self.lr = learning_rate_decay(hp.lr, self.global_step)
             self.optimizer = tf.train.AdamOptimizer(learning_rate=self.lr)
             if use_tpu:
-                self.optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
+                self.optimizer = tf.contrib.tpu.CrossShardOptimizer(self.optimizer)
 
             tf.summary.scalar("lr", self.lr)
 
@@ -134,7 +134,7 @@ class Graph:
             for grad, var in self.gvs:
                 grad = tf.clip_by_value(grad, -1., 1.)
                 self.clipped.append((grad, var))
-                self.train_op = self.optimizer.apply_gradients(self.clipped, global_step=self.global_step)
+            self.train_op = self.optimizer.apply_gradients(self.clipped, global_step=self.global_step)
 
             # Summary
             self.merged = tf.summary.merge_all()
