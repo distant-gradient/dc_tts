@@ -1,6 +1,7 @@
 import tensorflow as tf
 
 import train
+from hyperparams import Hyperparams as hp
 
 flags = tf.flags
 FLAGS = flags.FLAGS
@@ -13,8 +14,19 @@ flags.DEFINE_string(
         "output_dir", None,
         "The output directory where the model checkpoints will be written.")
 
+flags.DEFINE_string(
+        "input_file_pattern", None,
+        "The input dir with TFRecords.")
+
 flags.DEFINE_integer(
         "train_batch_size", 32, "Size of training batch")
+
+flags.DEFINE_integer(
+        "iterations_per_loop", 10, "This is the number of train steps running in TPU system before returning to CPU host for each Session.run")
+
+flags.DEFINE_integer(
+        "save_checkpoints_steps", 10, "Num steps after which to checkpoint")
+
 
 flags.DEFINE_integer(
         "eval_batch_size", 32, "Size of eval batch")
@@ -43,9 +55,12 @@ flags.DEFINE_integer(
         "num_tpu_cores", 8,
         "Only used if `use_tpu` is True. Total number of TPU cores to use.")
 
+flags.DEFINE_string(
+        "init_checkpoint", None,
+        "Initial checkpoint (usually from a pre-trained model).")
 
-def model_fn_builder(task_num, init_checkpoint, learning_rate,
-                     num_warmup_steps, use_tpu):
+
+def model_fn_builder(task_num, init_checkpoint, use_tpu):
     def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
         """
     	The `model_fn` for TPUEstimator.
@@ -62,7 +77,7 @@ def model_fn_builder(task_num, init_checkpoint, learning_rate,
         sents, mels, mags = features["sent"], features["mels"], features["mags"] 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
      
-        graph = train.Graph(task_num, L=sent, mels=mels, mags=mags, use_tpu=use_tpu)
+        graph = train.Graph(task_num, L=sents, mels=mels, mags=mags, use_tpu=use_tpu)
         
         tvars = tf.trainable_variables()
         initialized_variable_names = {}
@@ -94,6 +109,7 @@ def model_fn_builder(task_num, init_checkpoint, learning_rate,
     	    train_op=graph.train_op,
     	    scaffold_fn=scaffold_fn)
 	return output_spec
+    return model_fn
 
 
 def parse_fn(example_proto):
@@ -110,6 +126,8 @@ def parse_fn(example_proto):
     mags = features["mags"]
     mags = tf.sparse_to_dense(mags.indices, mags.dense_shape, mags.values, default_value=0.0)
     features["mags"] = tf.reshape(mags, [-1, hp.n_fft//2+1])
+    sent = features["sent"]
+    features["sent"] = tf.sparse_to_dense(sent.indices, sent.dense_shape, sent.values, default_value=0)
     return features
 
 def input_fn_builder(input_path, num_epochs=500):
@@ -151,19 +169,18 @@ def main(_):
     model_fn = model_fn_builder(
   	    task_num=task_num,
   	    init_checkpoint=FLAGS.init_checkpoint,
-  	    learning_rate=FLAGS.learning_rate,
-  	    num_warmup_steps=3,
   	    use_tpu=FLAGS.use_tpu)
 
     estimator = tf.contrib.tpu.TPUEstimator(
         use_tpu=FLAGS.use_tpu,
         model_fn=model_fn,
         config=run_config,
+        params={},
         train_batch_size=FLAGS.train_batch_size,
         eval_batch_size=FLAGS.eval_batch_size)
 
     train_input_fn = input_fn_builder(
-        input_path=FLAGS.input_path)
+        input_path=FLAGS.input_file_pattern)
     estimator.train(input_fn=train_input_fn, max_steps=100000)
 
 if __name__ == "__main__":
