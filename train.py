@@ -37,10 +37,11 @@ class Graph:
         ## mels: Reduced melspectrogram. (B, T/r, n_mels) float32
         ## mags: Magnitude. (B, T, n_fft//2+1) float32
         if mode=="train":
-            if L != None and mels != None and mags != None:
-                self.L, self.mels, self.mags = L, mels, mags
-            else:
-                self.L, self.mels, self.mags, self.fnames, self.num_batch = get_batch()
+            # if L != None and mels != None and mags != None:
+            #   self.L, self.mels, self.mags = L, mels, mags
+            # else:
+            #   self.L, self.mels, self.mags, self.fnames, self.num_batch = get_batch()
+            self.L, self.mels, self.mags, self.fnames, self.num_batch = get_batch()
             self.prev_max_attentions = tf.ones(shape=(hp.B,), dtype=tf.int32)
             self.gts = tf.convert_to_tensor(guided_attention())
         else:  # Synthesize
@@ -100,11 +101,13 @@ class Graph:
                 # total loss
                 self.loss = self.loss_mels + self.loss_bd1 + self.loss_att
 
-                tf.summary.scalar('train/loss_mels', self.loss_mels)
-                tf.summary.scalar('train/loss_bd1', self.loss_bd1)
-                tf.summary.scalar('train/loss_att', self.loss_att)
-                tf.summary.image('train/mel_gt', tf.expand_dims(tf.transpose(self.mels[:1], [0, 2, 1]), -1))
-                tf.summary.image('train/mel_hat', tf.expand_dims(tf.transpose(self.Y[:1], [0, 2, 1]), -1))
+                # TPU crash
+                # ValueError: Cannot use 'input_producer/input_producer/fraction_of_32_full' as input to 'Merge_2/MergeSummary' because 'input_producer/input_producer/fraction_of_32_full' is in a while loop. See info log for more details 
+                # tf.summary.scalar('train/loss_mels'r self.loss_mels)
+                # tf.summary.scalar('train/loss_bd1', self.loss_bd1)
+                # tf.summary.scalar('train/loss_att', self.loss_att)
+                # tf.summary.image('train/mel_gt', tf.expand_dims(tf.transpose(self.mels[:1], [0, 2, 1]), -1))
+                # tf.summary.image('train/mel_hat', tf.expand_dims(tf.transpose(self.Y[:1], [0, 2, 1]), -1))
             else: # SSRN
                 # mag L1 loss
                 self.loss_mags = tf.reduce_mean(tf.abs(self.Z - self.mags))
@@ -115,10 +118,10 @@ class Graph:
                 # total loss
                 self.loss = self.loss_mags + self.loss_bd2
 
-                tf.summary.scalar('train/loss_mags', self.loss_mags)
-                tf.summary.scalar('train/loss_bd2', self.loss_bd2)
-                tf.summary.image('train/mag_gt', tf.expand_dims(tf.transpose(self.mags[:1], [0, 2, 1]), -1))
-                tf.summary.image('train/mag_hat', tf.expand_dims(tf.transpose(self.Z[:1], [0, 2, 1]), -1))
+                # tf.summary.scalar('train/loss_mags', self.loss_mags)
+                # tf.summary.scalar('train/loss_bd2', self.loss_bd2)
+                # tf.summary.image('train/mag_gt', tf.expand_dims(tf.transpose(self.mags[:1], [0, 2, 1]), -1))
+                # tf.summary.image('train/mag_hat', tf.expand_dims(tf.transpose(self.Z[:1], [0, 2, 1]), -1))
 
             # Training Scheme
             self.lr = learning_rate_decay(hp.lr, self.global_step)
@@ -126,7 +129,7 @@ class Graph:
             if use_tpu:
                 self.optimizer = tf.contrib.tpu.CrossShardOptimizer(self.optimizer)
 
-            tf.summary.scalar("lr", self.lr)
+            # tf.summary.scalar("lr", self.lr)
 
             ## gradient clipping
             self.gvs = self.optimizer.compute_gradients(self.loss)
@@ -137,7 +140,7 @@ class Graph:
             self.train_op = self.optimizer.apply_gradients(self.clipped, global_step=self.global_step)
 
             # Summary
-            self.merged = tf.summary.merge_all()
+            # self.merged = tf.summary.merge_all()
 
 
 if __name__ == '__main__':
@@ -151,7 +154,8 @@ if __name__ == '__main__':
     with sv.managed_session() as sess:
         while 1:
             for _ in tqdm(range(g.num_batch), total=g.num_batch, ncols=70, leave=False, unit='b'):
-                gs, _ = sess.run([g.global_step, g.train_op])
+                gs, _, loss = sess.run([g.global_step, g.train_op, g.loss])
+                print(loss)
 
                 # Write checkpoint files at every 1k steps
                 if gs % 1000 == 0:

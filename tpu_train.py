@@ -19,7 +19,7 @@ flags.DEFINE_string(
         "The input dir with TFRecords.")
 
 flags.DEFINE_integer(
-        "train_batch_size", 4, "Size of training batch")
+        "train_batch_size", 32, "Size of training batch")
 
 flags.DEFINE_integer(
         "iterations_per_loop", 10, "This is the number of train steps running in TPU system before returning to CPU host for each Session.run")
@@ -29,7 +29,7 @@ flags.DEFINE_integer(
 
 
 flags.DEFINE_integer(
-        "eval_batch_size", 2, "Size of eval batch")
+        "eval_batch_size", 8, "Size of eval batch")
 
 flags.DEFINE_string(
         "tpu_name", None,
@@ -105,10 +105,15 @@ def model_fn_builder(task_num, init_checkpoint, use_tpu):
                           init_string)
 
         output_spec = tf.contrib.tpu.TPUEstimatorSpec(
-    	    mode=mode,
-    	    loss=graph.loss,
-    	    train_op=graph.train_op,
-    	    scaffold_fn=scaffold_fn)
+    	   mode=mode,
+    	   loss=graph.loss,
+    	   train_op=graph.train_op,
+    	   scaffold_fn=scaffold_fn)
+        #output_spec = tf.estimator.EstimatorSpec(
+        #        mode=mode,
+        #        loss=graph.loss,
+        #        train_op=graph.train_op)
+
 	return output_spec
     return model_fn
 
@@ -136,12 +141,14 @@ def input_fn_builder(input_path, num_epochs=500):
     def input_fn(params):
         batch_size = params["batch_size"]
         files = tf.data.Dataset.list_files(input_path)
-        tf.logging.info("Reading batch size: %d from %s" % (batch_size,  input_path))
         dataset = tf.data.TFRecordDataset(files, num_parallel_reads=32)
         dataset = dataset.shuffle(1000)
         dataset = dataset.repeat(num_epochs)
         dataset = dataset.map(parse_fn, num_parallel_calls=64)
-        dataset = dataset.padded_batch(batch_size, padded_shapes={"mels": [-1, hp.n_mels], "mags": [-1, hp.n_fft//2+1], "sent": [-1], "mags_shape": [2], "mels_shape": [2]})
+        # dataset = dataset.padded_batch(batch_size, padded_shapes={"mels": [-1, hp.n_mels], "mags": [-1, hp.n_fft//2+1], "sent": [-1], "mags_shape": [2], "mels_shape": [2]})
+        dataset = dataset.padded_batch(batch_size, padded_shapes={"mels": [100, hp.n_mels], "mags": [1000, hp.n_fft//2+1], "sent": [100], "mags_shape": [2], "mels_shape": [2]}, drop_remainder=True)
+        # This cannot be crashing due to 
+        # ValueError: The features to the model returned by input_fn must have static shape. Tensor: Tensor("InfeedQueue/dequeue:0", shape=(?, 1000, 1025), dtype=float32, device=/device:TPU_REPLICATED_CORE:0)
         dataset = dataset.prefetch(2)
         return dataset
     return input_fn
@@ -174,11 +181,14 @@ def main(_):
   	    init_checkpoint=FLAGS.init_checkpoint,
   	    use_tpu=FLAGS.use_tpu)
 
+    # estimator = tf.estimator.Estimator(
+    #    model_fn=model_fn,
+    #     params={"batch_size": 5},
+    #    config=run_config)
     estimator = tf.contrib.tpu.TPUEstimator(
         use_tpu=FLAGS.use_tpu,
         model_fn=model_fn,
         config=run_config,
-        params={},
         train_batch_size=FLAGS.train_batch_size,
         eval_batch_size=FLAGS.eval_batch_size)
 
