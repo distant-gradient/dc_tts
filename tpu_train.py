@@ -138,7 +138,7 @@ def input_fn_builder(input_path, num_epochs=500):
         dataset = dataset.shuffle(1000)
         dataset = dataset.repeat(num_epochs)
         dataset = dataset.map(parse_fn, num_parallel_calls=64)
-        dataset = dataset.batch(batch_size)
+        dataset = dataset.padded_batch(batch_size, [-1, -1])
         dataset = dataset.prefetch(2)
         return dataset
     return input_fn
