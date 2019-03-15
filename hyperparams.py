@@ -26,6 +26,7 @@ class Hyperparams:
     # Model
     r = 4 # Reduction factor. Do not change this.
     dropout_rate = 0.05
+    # dropout_rate = 0.0
     e = 128 # == embedding
     d = 256 # == hidden units of Text2Mel
     c = 512 # == hidden units of SSRN
@@ -37,10 +38,12 @@ class Hyperparams:
     test_data = 'harvard_sentences.txt'
     vocab = "PE abcdefghijklmnopqrstuvwxyz'.,?" # P: Padding, E: EOS. cannot exceed 256 chars due to TFRecords
     max_N = 180 # Maximum number of characters.
+    #max_T = 30 # Maximum number of mel frames.
     max_T = 210 # Maximum number of mel frames.
 
     # training scheme
-    lr = 0.001 # Initial learning rate.
+    # lr = 0.001 # Initial learning rate.
+    lr = 0.11 # Initial learning rate.
     logdir = "logdir/LJ01"
     sampledir = 'samples'
     B = 5 # batch size

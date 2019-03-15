@@ -33,9 +33,10 @@ def embed(inputs, vocab_size, num_units, zero_pad=True, scope="embedding", reuse
                                        dtype=tf.float32, 
                                        shape=[vocab_size, num_units],
                                        initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
-        if zero_pad:
-            lookup_table = tf.concat((tf.zeros(shape=[1, num_units]), 
-                                      lookup_table[1:, :]), 0)
+        # tpu check
+        # if zero_pad:
+        #    lookup_table = tf.concat((tf.zeros(shape=[1, num_units]), 
+        #                              lookup_table[1:, :]), 0)
 
         outputs = tf.nn.embedding_lookup(lookup_table, inputs)
 
@@ -182,15 +183,24 @@ def hc(inputs,
 
         params = {"inputs": inputs, "filters": 2*filters, "kernel_size": size,
                   "dilation_rate": rate, "padding": padding, "use_bias": use_bias,
-                  "kernel_initializer": tf.contrib.layers.variance_scaling_initializer(), "reuse": reuse}
+                  "kernel_initializer": tf.contrib.layers.variance_scaling_initializer(), "reuse": reuse} # commenting for TPU
 
         tensor = tf.layers.conv1d(**params)
         H1, H2 = tf.split(tensor, 2, axis=-1)
-        H1 = normalize(H1, scope="H1")
-        H2 = normalize(H2, scope="H2")
+        H1 = normalize(H1, scope="%s_H1" % scope)
+        H2 = normalize(H2, scope="%s_H2" % scope)
         H1 = tf.nn.sigmoid(H1, "gate")
         H2 = activation_fn(H2, "info") if activation_fn is not None else H2
-        tensor = H1*H2 + (1.-H1)*_inputs
+        tensor = H1 * H2 + (1.-H1) * _inputs
+        # tensor = normalize(tensor, scope="tensor")
+        # params = {"inputs": inputs, "filters": filters, "kernel_size": size,
+        #           "dilation_rate": rate, "padding": padding, "use_bias": use_bias,
+        #           "kernel_initializer": tf.contrib.layers.variance_scaling_initializer(), "reuse": reuse} # commenting for TPU
+
+        # tensor = tf.layers.conv1d(**params)
+        # tensor = normalize(tensor, scope="H1")
+        # tensor = activation_fn(tensor, "info") if activation_fn is not None else tensor
+        # tensor = tensor + _inputs
 
         tensor = tf.layers.dropout(tensor, rate=dropout_rate, training=training)
 

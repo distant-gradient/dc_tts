@@ -37,11 +37,11 @@ class Graph:
         ## mels: Reduced melspectrogram. (B, T/r, n_mels) float32
         ## mags: Magnitude. (B, T, n_fft//2+1) float32
         if mode=="train":
-            # if L != None and mels != None and mags != None:
-            #   self.L, self.mels, self.mags = L, mels, mags
-            # else:
-            #   self.L, self.mels, self.mags, self.fnames, self.num_batch = get_batch()
-            self.L, self.mels, self.mags, self.fnames, self.num_batch = get_batch()
+            if L != None and mels != None and mags != None:
+              self.L, self.mels, self.mags = L, mels, mags
+            else:
+              self.L, self.mels, self.mags, self.fnames, self.num_batch = get_batch()
+            # self.L, self.mels, self.mags, self.fnames, self.num_batch = get_batch()
             self.prev_max_attentions = tf.ones(shape=(hp.B,), dtype=tf.int32)
             self.gts = tf.convert_to_tensor(guided_attention())
         else:  # Synthesize
@@ -137,7 +137,8 @@ class Graph:
             for grad, var in self.gvs:
                 grad = tf.clip_by_value(grad, -1., 1.)
                 self.clipped.append((grad, var))
-            self.train_op = self.optimizer.apply_gradients(self.clipped, global_step=self.global_step)
+            # self.train_op = self.optimizer.apply_gradients(self.clipped, global_step=self.global_step)
+            self.train_op = self.optimizer.apply_gradients(self.clipped, global_step=tf.train.get_global_step())
 
             # Summary
             # self.merged = tf.summary.merge_all()

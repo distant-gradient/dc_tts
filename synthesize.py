@@ -18,6 +18,10 @@ from data_load import load_data
 from scipy.io.wavfile import write
 from tqdm import tqdm
 
+
+MODEL_1 = "gs://stellarworks-speech/out/dc_tts_1_exp_9"
+MODEL_2 = "gs://stellarworks-speech/out/dc_tts_2_exp_5"
+
 def synthesize():
     # Load data
     L = load_data("synthesize")
@@ -31,19 +35,20 @@ def synthesize():
         # Restore parameters
         var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'Text2Mel')
         saver1 = tf.train.Saver(var_list=var_list)
-        saver1.restore(sess, tf.train.latest_checkpoint(hp.logdir + "-1"))
+        saver1.restore(sess, tf.train.latest_checkpoint(MODEL_1))
         print("Text2Mel Restored!")
 
         var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'SSRN') + \
                    tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 'gs')
         saver2 = tf.train.Saver(var_list=var_list)
-        saver2.restore(sess, tf.train.latest_checkpoint(hp.logdir + "-2"))
+        saver2.restore(sess, tf.train.latest_checkpoint(MODEL_2))
         print("SSRN Restored!")
 
         # Feed Forward
         ## mel
         Y = np.zeros((len(L), hp.max_T, hp.n_mels), np.float32)
         prev_max_attentions = np.zeros((len(L),), np.int32)
+        # for j in tqdm(range(30)):
         for j in tqdm(range(hp.max_T)):
             _gs, _Y, _max_attentions, _alignments = \
                 sess.run([g.global_step, g.Y, g.max_attentions, g.alignments],

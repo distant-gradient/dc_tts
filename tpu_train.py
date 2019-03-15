@@ -19,13 +19,13 @@ flags.DEFINE_string(
         "The input dir with TFRecords.")
 
 flags.DEFINE_integer(
-        "train_batch_size", 32, "Size of training batch")
+        "train_batch_size", 24, "Size of training batch")
 
 flags.DEFINE_integer(
-        "iterations_per_loop", 10, "This is the number of train steps running in TPU system before returning to CPU host for each Session.run")
+        "iterations_per_loop", 500, "This is the number of train steps running in TPU system before returning to CPU host for each Session.run")
 
 flags.DEFINE_integer(
-        "save_checkpoints_steps", 10, "Num steps after which to checkpoint")
+        "save_checkpoints_steps", 2000, "Num steps after which to checkpoint")
 
 
 flags.DEFINE_integer(
@@ -141,15 +141,15 @@ def input_fn_builder(input_path, num_epochs=500):
     def input_fn(params):
         batch_size = params["batch_size"]
         files = tf.data.Dataset.list_files(input_path)
-        dataset = tf.data.TFRecordDataset(files, num_parallel_reads=32)
+        dataset = tf.data.TFRecordDataset(files, num_parallel_reads=64)
         dataset = dataset.shuffle(1000)
         dataset = dataset.repeat(num_epochs)
         dataset = dataset.map(parse_fn, num_parallel_calls=64)
         # dataset = dataset.padded_batch(batch_size, padded_shapes={"mels": [-1, hp.n_mels], "mags": [-1, hp.n_fft//2+1], "sent": [-1], "mags_shape": [2], "mels_shape": [2]})
-        dataset = dataset.padded_batch(batch_size, padded_shapes={"mels": [100, hp.n_mels], "mags": [1000, hp.n_fft//2+1], "sent": [100], "mags_shape": [2], "mels_shape": [2]}, drop_remainder=True)
+        dataset = dataset.padded_batch(batch_size, padded_shapes={"mels": [250, hp.n_mels], "mags": [1000, hp.n_fft//2+1], "sent": [200], "mags_shape": [2], "mels_shape": [2]}, drop_remainder=True)
         # This cannot be crashing due to 
         # ValueError: The features to the model returned by input_fn must have static shape. Tensor: Tensor("InfeedQueue/dequeue:0", shape=(?, 1000, 1025), dtype=float32, device=/device:TPU_REPLICATED_CORE:0)
-        dataset = dataset.prefetch(2)
+        dataset = dataset.prefetch(20)
         return dataset
     return input_fn
 
@@ -194,7 +194,7 @@ def main(_):
 
     train_input_fn = input_fn_builder(
         input_path=FLAGS.input_file_pattern)
-    estimator.train(input_fn=train_input_fn, max_steps=100)
+    estimator.train(input_fn=train_input_fn, max_steps=500000)
 
 if __name__ == "__main__":
     flags.mark_flag_as_required("task_num")

@@ -144,7 +144,8 @@ def Attention(Q, K, V, mononotic_attention=False, prev_max_attentions=None):
         masks = tf.logical_or(key_masks, reverse_masks)
         masks = tf.tile(tf.expand_dims(masks, 1), [1, hp.max_T, 1])
         paddings = tf.ones_like(A) * (-2 ** 32 + 1)  # (B, T/r, N)
-        A = tf.where(tf.equal(masks, False), A, paddings)
+        A = tf.where(tf.equal(masks, False), A, paddings) 
+
     A = tf.nn.softmax(A) # (B, T/r, N)
     max_attentions = tf.argmax(A, -1)  # (B, T/r)
     R = tf.matmul(A, V)
